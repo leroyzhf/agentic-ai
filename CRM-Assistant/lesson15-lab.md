@@ -28,20 +28,20 @@
 
 要求：
 1. 新建一个 Bitable
-2. 创建两张表：Customers 和 OpportunitySnapshots
+2. 创建两张表：客户信息和商机快照
 3. 字段名称必须和下面完全一致，先全部按文本字段创建；Lead Score 可用数字字段，高净值优先可用复选框字段，时间字段可用日期时间字段
 
-Customers 字段：
+客户信息字段：
 客户ID、客户名称、客户公司、行业、MBTI、是否单身、沟通风格、成交阻力、价格敏感程度、风险顾虑、客户画像摘要、客户负责人、最后更新时间、数据来源
 
-OpportunitySnapshots 字段：
+商机快照字段：
 商机ID、客户ID、客户名称、客户公司、机会名称、商机描述、当前阶段、Lead Score、意向等级、高净值优先、销售区域、业务价值、推荐动作、最新进展、下次跟进时间、最近会议时间、商机负责人、数据来源
 
 创建完成后请给我：
 1. Base 链接
 2. app_token
-3. Customers 的 table_id
-4. OpportunitySnapshots 的 table_id
+3. 客户信息的 table_id
+4. 商机快照的 table_id
 ```
 
 龙虾会返回 `app_token` 和两张表的 `table_id`，先记下来，后面配置会用到。
@@ -82,8 +82,8 @@ OpportunitySnapshots 字段：
 > **⚠️ 发送前先自己填好真实值，不要把占位符发出去。**
 > - `FEISHU_APP_ID` / `FEISHU_APP_SECRET`：飞书开放平台 → 应用详情页获取
 > - `FEISHU_BITABLE_APP_TOKEN`：第 1 步龙虾返回的 `app_token`
-> - `FEISHU_CUSTOMER_TABLE_ID`：Customers 的 `table_id`
-> - `FEISHU_OPPORTUNITY_TABLE_ID`：OpportunitySnapshots 的 `table_id`
+> - `FEISHU_CUSTOMER_TABLE_ID`：客户信息的 `table_id`
+> - `FEISHU_OPPORTUNITY_TABLE_ID`：商机快照的 `table_id`
 
 把你的真实值替换进去，发送：
 
@@ -137,8 +137,8 @@ FEISHU_OPPORTUNITY_TABLE_ID=tblxxxxxxxx
 完成后告诉我：
 1. 是否能拿到 tenant_access_token
 2. 是否能列出两张表
-3. Customers 字段是否完整
-4. OpportunitySnapshots 字段是否完整
+3. 客户信息字段是否完整
+4. 商机快照字段是否完整
 5. 如果字段缺失，请列出缺失字段
 ```
 
@@ -175,12 +175,12 @@ dry-run 会生成写表计划，但不会真实写入飞书。
 ```text
 请用 CRM-Assistant 把本次 CRM 结果真实写入飞书多维表格。
 
-请使用第 4 步生成的 crm_packet.json 和第 3 步配置好的 .env.local。飞书写表请使用用户权限（user identity），不要使用应用权限。这一次请真实写入飞书：Customers 表按客户 ID 新增或更新，OpportunitySnapshots 表追加一条商机推进快照。输出结果请保存到 runtime/lab15_feishu/write_once。
+请使用第 4 步生成的 crm_packet.json 和第 3 步配置好的 .env.local。飞书写表请使用用户权限（user identity），不要使用应用权限。这一次请真实写入飞书：客户信息表按客户 ID 新增或更新，商机快照表追加一条商机推进快照。输出结果请保存到 runtime/lab15_feishu/write_once。
 
 执行完成后告诉我：
 1. 是否写入成功
-2. Customers 是新增还是更新
-3. OpportunitySnapshots 是否追加成功
+2. 客户信息是新增还是更新
+3. 商机快照是否追加成功
 4. 本次写入的客户名称、当前阶段、Lead Score、意向等级、推荐动作
 5. 如果失败，返回失败命令和完整报错
 ```
@@ -193,7 +193,7 @@ dry-run 会生成写表计划，但不会真实写入飞书。
 
 前面第 4–7 步把接入、理解、判断、沉淀拆开逐步验证。这一步用一条命令把整条链路串起来，从飞书原始 JSON 一步到底，直接写入飞书两张表。
 
-> **⚠️ 避免重复记录**：Customers 表按客户 ID 做 upsert，重复跑只会更新同一行；但 OpportunitySnapshots 表是 append，每跑一次追加一条。如果前面第 7 步已经真实写入过，建议换一份样本（例如 `guojiadianwang_pv_grid_need_confirmation_rich.json`），避免同一客户出现重复快照。
+> **⚠️ 避免重复记录**：客户信息表按客户 ID 做 upsert，重复跑只会更新同一行；但 商机快照表是 append，每跑一次追加一条。如果前面第 7 步已经真实写入过，建议换一份样本（例如 `guojiadianwang_pv_grid_need_confirmation_rich.json`），避免同一客户出现重复快照。
 
 ```text
 请用 CRM-Assistant 一键跑完全链路：从飞书原始 JSON 生成 CRM 结果，并写入飞书多维表格。
@@ -206,8 +206,8 @@ dry-run 会生成写表计划，但不会真实写入飞书。
 1. build_result_path 是否生成
 2. crm_packet_path 是否生成
 3. sync_result_path 是否生成
-4. Customers 是新增还是更新
-5. OpportunitySnapshots 是否追加成功
+4. 客户信息是新增还是更新
+5. 商机快照是否追加成功
 ```
 
 这一步等价于把前面三条命令串联执行：
@@ -265,15 +265,15 @@ CRM_ASSISTANT_ROOT=~/projects/agentic-ai/CRM-Assistant
 
 - [ ] 龙虾 git pull 并初始化 CRM-Assistant 成功
 - [ ] `python scripts/crm_assistant.py --help` 能正常输出
-- [ ] 飞书 Base 已创建，包含 Customers 和 OpportunitySnapshots 两张表
+- [ ] 飞书 Base 已创建，包含客户信息和商机快照两张表
 - [ ] `.env.local` 已配置真实 FEISHU_APP_ID / FEISHU_APP_SECRET / FEISHU_BITABLE_APP_TOKEN / table_id
 - [ ] 本地样本生成 `context.json`、`transcript.txt`、`crm_packet.json`
 - [ ] 本地样本生成 `customer_table_row.json` 和 `opportunity_snapshot_row.json`
 - [ ] `inspect-feishu-bitable` 能读到两张表字段
 - [ ] `sync-feishu-bitable --dry-run` 生成写表计划但不真实写入
 - [ ] 去掉 `--dry-run` 后真实写入成功
-- [ ] 飞书 Customers 表能看到客户画像记录
-- [ ] 飞书 OpportunitySnapshots 表能看到商机推进快照记录
+- [ ] 飞书客户信息表能看到客户画像记录
+- [ ] 飞书商机快照表能看到商机推进快照记录
 - [ ] Skill 已注册到 `~/.openclaw/workspace/skills/`
 - [ ] 龙虾能通过 Skill 自动完成会议 → CRM 写入
 
@@ -284,14 +284,14 @@ CRM_ASSISTANT_ROOT=~/projects/agentic-ai/CRM-Assistant
 | 龙虾报的错 | 原因 | 你发什么 |
 |---|---|---|
 | `Missing Feishu app token` | 没加载 .env.local 或变量名不对 | 「请检查 .env.local 里是否有 FEISHU_BITABLE_APP_TOKEN」 |
-| `Missing customer table id` | Customers 表 ID 缺失 | 「请检查 .env.local 里是否有 FEISHU_CUSTOMER_TABLE_ID」 |
-| `Missing opportunity table id` | OpportunitySnapshots 表 ID 缺失 | 「请检查 .env.local 里是否有 FEISHU_OPPORTUNITY_TABLE_ID」 |
+| `Missing customer table id` | 客户信息表 ID 缺失 | 「请检查 .env.local 里是否有 FEISHU_CUSTOMER_TABLE_ID」 |
+| `Missing opportunity table id` | 商机快照表 ID 缺失 | 「请检查 .env.local 里是否有 FEISHU_OPPORTUNITY_TABLE_ID」 |
 | `tenant_access_token missing` | App ID / App Secret 错误或应用未发布 | 「请重新核对 .env.local 里的 FEISHU_APP_ID / FEISHU_APP_SECRET」 |
 | `Feishu API failed` | 权限、表 ID 或字段类型不匹配 | 「请返回完整报错，并重新执行 inspect-feishu-bitable」 |
 | `403 Forbidden` / 写表失败 | 使用了应用权限，应用身份无写权限 | 「飞书写表请使用用户权限（user identity），不要使用应用权限」 |
 | 字段缺失 | 建表时字段名和脚本字段不一致 | 「请按实验手册第 1 步补齐缺失字段，字段名保持完全一致」 |
 | 只生成 JSON 没写表 | 跑的是本地处理命令或带了 `--dry-run` | 「请确认执行的是 sync-feishu-bitable 且没有 --dry-run」 |
-| Customers 被覆盖了旧画像 | 当前输入有弱值或历史值保护未生效 | 「请返回 crm_packet.json 和 feishu_sync_result.json 里 customer_table_row 的内容」 |
+| 客户信息被覆盖了旧画像 | 当前输入有弱值或历史值保护未生效 | 「请返回 crm_packet.json 和 feishu_sync_result.json 里 customer_table_row 的内容」 |
 | Skill 注册后龙虾没触发 | Skill 目录没复制到正确位置 | 「请确认 ~/.openclaw/workspace/skills/crm-assistant/SKILL.md 存在」 |
 | 找不到项目目录 | 环境变量未配置 | 「请确认 ~/.openclaw/.env 中 CRM_ASSISTANT_ROOT 已设置」 |
 

@@ -28,7 +28,7 @@
 |---|---|
 | Python 3.10+ | 无第三方依赖，标准库即可运行 |
 | 飞书开发者应用 | 有 App ID / App Secret，已开通多维表格相关权限 |
-| 飞书多维表格 | 包含 Customers 和 OpportunitySnapshots 两张表 |
+| 飞书多维表格 | 包含客户信息和商机快照两张表 |
 
 ## 快速开始
 
@@ -103,8 +103,8 @@ python scripts/crm_assistant.py build-context-from-feishu \
 
 | 飞书表 | 写入方式 | 回答的问题 |
 |---|---|---|
-| Customers（客户信息） | upsert（同 ID 更新） | 这个客户是谁？该怎么跟他沟通？ |
-| OpportunitySnapshots（商机快照） | append（每轮追加） | 这单现在在哪？下一步该怎么推？ |
+| 客户信息 | upsert（同 ID 更新） | 这个客户是谁？该怎么跟他沟通？ |
+| 商机快照 | append（每轮追加） | 这单现在在哪？下一步该怎么推？ |
 
 ## 核心模块
 
@@ -243,11 +243,11 @@ python scripts/crm_assistant.py ingest-feishu-raw-to-bitable \
 
 ## 飞书表字段
 
-### Customers 表（客户信息）
+### 客户信息表
 
 客户ID、客户名称、客户公司、行业、MBTI、是否单身、沟通风格、成交阻力、价格敏感程度、风险顾虑、客户画像摘要、客户负责人、最后更新时间、数据来源
 
-### OpportunitySnapshots 表（商机推进快照）
+### 商机快照表
 
 商机ID、客户ID、客户名称、客户公司、机会名称、商机描述、当前阶段、Lead Score、意向等级、高净值优先、销售区域、业务价值、推荐动作、最新进展、下次跟进时间、最近会议时间、商机负责人、数据来源
 
@@ -258,8 +258,8 @@ python scripts/crm_assistant.py ingest-feishu-raw-to-bitable \
 1. `context.json` 和 `transcript.txt` 已生成
 2. `crm_packet.json` 包含 8 类结构化结果
 3. `customer_table_row.json` 弱值已被历史强值保护
-4. 飞书 Customers 表有客户画像记录（upsert 成功）
-5. 飞书 OpportunitySnapshots 表有商机推进快照（append 成功）
+4. 飞书客户信息表有客户画像记录（upsert 成功）
+5. 飞书商机快照表有商机推进快照（append 成功）
 
 ## 目录结构
 

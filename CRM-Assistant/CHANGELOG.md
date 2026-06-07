@@ -1,5 +1,12 @@
 # Changelog
 
+### 飞书表名中文化与写表权限说明
+
+- 飞书两张表名从英文改为中文：Customers → 客户信息，OpportunitySnapshots → 商机快照
+- 第 6/7/8 步 prompt 明确要求使用用户权限（user identity）写表，避免应用权限 403
+- 第 8 步标题改为"一键全链路"，去掉 ingest 术语，新增重复记录警告
+- 常见问题速查新增 403 Forbidden 条目
+
 ### 环境变量配置统一
 
 - 新增 `.env.example` 环境变量模板，与第 13/14 节格式统一（`cp .env.example .env.local`）
