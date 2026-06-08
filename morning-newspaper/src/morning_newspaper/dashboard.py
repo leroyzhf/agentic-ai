@@ -1,9 +1,29 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone, timedelta
 from html import escape
 import json
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
+
+_BEIJING = timezone(timedelta(hours=8))
+
+
+def _to_beijing_time(iso_str: str) -> str:
+    """将 ISO 时间字符串转为北京时间显示格式，如 '2026-06-08 17:15 CST'。"""
+    text = (iso_str or "").strip()
+    if not text:
+        return ""
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return iso_str
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    beijing = dt.astimezone(_BEIJING)
+    return beijing.strftime("%Y-%m-%d %H:%M CST")
 
 
 def write_static_dashboard(runtime_dir: Path, output_path: Path) -> Path:
@@ -158,7 +178,7 @@ def _render_html(data: Dict[str, Any]) -> str:
     top_items = data.get("top_items", [])
     mail_alerts = data.get("mail_alerts", [])
     source_health = data.get("source_health", [])
-    generated_at = escape(str(data.get("generated_at", "")))
+    generated_at = escape(_to_beijing_time(str(data.get("generated_at", ""))))
     return f"""<!doctype html>
 <html lang="zh-CN">
 <head>
