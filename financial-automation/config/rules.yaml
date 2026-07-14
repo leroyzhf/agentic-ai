@@ -25,12 +25,7 @@ expense_type_rules:
   transportation_fee:
     required_fields:
       - buyer_name
-      - route
-      - transport_number
-      - from_station
-      - to_station
-      - travel_date
-      - passenger_name
+      - issue_date
     max_amount: 2000
   unknown:
     required_fields:
