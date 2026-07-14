@@ -27,6 +27,18 @@ expense_type_rules:
       - buyer_name
       - issue_date
     max_amount: 2000
+    # Sub-type specific rules. Rail (铁路电子客票) still requires the
+    # full ticket fields; ride-hailing/taxi (transport_subtype=other) only
+    # needs the base fields above.
+    subtype_rules:
+      rail:
+        required_fields:
+          - route
+          - transport_number
+          - from_station
+          - to_station
+          - travel_date
+          - passenger_name
   unknown:
     required_fields:
       - buyer_name

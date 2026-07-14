@@ -138,6 +138,21 @@ def _validate_single_item(
                 )
             )
 
+    # Sub-type specific required fields (e.g. rail tickets need 车次/站点/乘车人,
+    # while ride-hailing/taxi invoices do not).
+    subtype = item.get("transport_subtype")
+    subtype_rules = (type_rules.get("subtype_rules") or {}).get(str(subtype) or "", {})
+    for field_name in subtype_rules.get("required_fields", []):
+        if not _is_field_present(item, field_name):
+            findings.append(
+                _make_finding(
+                    code="missing_required_field",
+                    severity=severity_map.get("missing_required_field", "error"),
+                    message=f"Missing {subtype} sub-type field: {field_name}",
+                    field=field_name,
+                )
+            )
+
     if invoice_type == "unknown":
         findings.append(
             _make_finding(

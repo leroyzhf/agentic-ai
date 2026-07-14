@@ -207,12 +207,20 @@ def parse_fields_from_text(text: str, default_currency: str = "CNY") -> dict[str
     if invoice_type == "unknown":
         review_reasons.append("unknown_expense_type")
 
+    # Sub-classify transportation invoices so validation can apply strict
+    # rules to rail tickets (车次/站点/乘车人 required) while treating
+    # ride-hailing/taxi "运输服务" invoices with a lighter field set.
+    transport_subtype = None
+    if invoice_type == "transportation_fee":
+        transport_subtype = "rail" if _is_rail_ticket(normalized) else "other"
+
     return {
         "invoice_number": invoice_number,
         "issue_date": issue_date,
         "amount": amount,
         "currency": default_currency,
         "invoice_type": invoice_type,
+        "transport_subtype": transport_subtype,
         "vendor": parties["vendor"],
         "vendor_tax_id": parties["vendor_tax_id"],
         "buyer_name": parties["buyer_name"],
@@ -285,6 +293,7 @@ def _extract_single_document(
         "amount": parsed["amount"],
         "currency": parsed["currency"],
         "invoice_type": parsed["invoice_type"],
+        "transport_subtype": parsed["transport_subtype"],
         "vendor": parsed["vendor"],
         "vendor_tax_id": parsed["vendor_tax_id"],
         "buyer_name": parsed["buyer_name"],
