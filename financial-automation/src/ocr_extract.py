@@ -32,7 +32,14 @@ AMOUNT_PATTERNS = (
 INVOICE_TYPE_KEYWORDS = {
     "conference_fee": ("会议", "会务", "注册费", "培训费"),
     "accommodation_fee": ("住宿", "酒店", "房费", "客房"),
-    "transportation_fee": ("机票", "车票", "火车", "高铁", "交通", "打车", "滴滴", "铁路", "电子客票"),
+    "transportation_fee": ("机票", "车票", "火车", "高铁", "交通", "打车", "滴滴", "铁路", "电子客票", "运输服务", "客运", "出租", "网约车"),
+}
+# Strong business-content signals (from the goods/service line) outrank incidental
+# hits found inside company names (e.g. a buyer named "...酒店管理有限公司").
+INVOICE_TYPE_STRONG_KEYWORDS = {
+    "conference_fee": ("注册费", "会务费", "会议费"),
+    "accommodation_fee": ("住宿费", "房费", "客房"),
+    "transportation_fee": ("运输服务", "客运服务", "客运服务费", "电子客票", "铁路电子客票", "车票", "机票"),
 }
 RAIL_TICKET_KEYWORDS = (
     "铁路电子客票",
@@ -499,10 +506,25 @@ def _extract_amount(text: str) -> tuple[float | None, float]:
 
 
 def _detect_invoice_type(text: str) -> tuple[str, float]:
+    # Weighted scoring instead of first-match-wins so incidental keyword hits
+    # (e.g. "酒店" inside a buyer company name) don't override the real
+    # goods/service content (e.g. "*运输服务*客运服务费").
+    scores: dict[str, int] = {}
     for expense_type, keywords in INVOICE_TYPE_KEYWORDS.items():
-        if any(keyword in text for keyword in keywords):
-            return expense_type, 0.8
-    return "unknown", 0.4
+        hits = sum(1 for keyword in keywords if keyword in text)
+        strong = sum(1 for keyword in INVOICE_TYPE_STRONG_KEYWORDS.get(expense_type, ()) if keyword in text)
+        score = hits + strong * 5  # strong (line-item) signals dominate
+        if score:
+            scores[expense_type] = score
+    if not scores:
+        return "unknown", 0.4
+    best_type = max(scores, key=lambda t: scores[t])
+    best_score = scores[best_type]
+    # Higher confidence when a strong signal was involved or the winner is unambiguous.
+    sorted_scores = sorted(scores.values(), reverse=True)
+    unambiguous = len(sorted_scores) == 1 or sorted_scores[0] > sorted_scores[1]
+    confidence = 0.85 if best_score >= 5 else (0.8 if unambiguous else 0.6)
+    return best_type, confidence
 
 
 def _extract_party_fields(text: str, invoice_type: str) -> dict[str, str | float | None]:
