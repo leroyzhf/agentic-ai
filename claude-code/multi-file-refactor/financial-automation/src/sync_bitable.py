@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -401,6 +401,8 @@ def _date_to_millis(value: Any) -> int | None:
         dt = datetime.fromisoformat(str(value))
     except ValueError:
         return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
     return int(dt.timestamp() * 1000)
 
 
