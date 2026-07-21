@@ -1,0 +1,104 @@
+name: multi-file-refactor CI
+
+# Trigger CI whenever the workspace under claude-code/multi-file-refactor/ or
+# this workflow file itself changes. Runs both apps' baselines, then scans for
+# hardcoded secrets.
+on:
+  push:
+    paths:
+      - "claude-code/multi-file-refactor/**"
+      - ".github/workflows/multi-file-refactor.yml"
+  pull_request:
+    paths:
+      - "claude-code/multi-file-refactor/**"
+      - ".github/workflows/multi-file-refactor.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: claude-code/multi-file-refactor
+
+jobs:
+  tests:
+    name: Baseline tests (financial + CRM)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install financial-automation deps
+        working-directory: claude-code/multi-file-refactor/financial-automation
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Expose the shared client via PYTHONPATH so both apps' imports resolve.
+      # This mirrors the local venv symlink we set up on disk.
+      - name: Run financial-automation smoke tests
+        working-directory: claude-code/multi-file-refactor/financial-automation
+        env:
+          PYTHONPATH: ${{ github.workspace }}/claude-code/multi-file-refactor/common
+        run: python -m unittest tests.test_smoke
+
+      - name: Run CRM-Assistant merge-policy tests
+        working-directory: claude-code/multi-file-refactor/CRM-Assistant
+        env:
+          PYTHONPATH: ${{ github.workspace }}/claude-code/multi-file-refactor/common
+        run: python scripts/crm_assistant.py run-merge-policy-tests
+
+  secret-scan:
+    name: Hardcoded secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Fetch full history so we can diff against origin/main for changed-file scan.
+          fetch-depth: 0
+
+      - name: Scan for hardcoded secrets
+        working-directory: claude-code/multi-file-refactor
+        run: |
+          set -u
+          FOUND=0
+
+          # Patterns we consider "hardcoded secrets" in this workspace.
+          # We intentionally scan only under our workspace + skip archived
+          # old_*.py (kept as pre-refactor references for the parity script).
+          PATTERNS=(
+            # Feishu app credentials assigned to a real-looking string
+            '(FEISHU_APP_ID|FEISHU_APP_SECRET|app_secret|app_id)\s*[:=]\s*"cli_[a-zA-Z0-9_-]{5,}"'
+            '(FEISHU_APP_SECRET|app_secret)\s*[:=]\s*"[a-zA-Z0-9]{20,}"'
+            # PEM keys or SSH keys embedded in source
+            '-----BEGIN (RSA |EC |OPENSSH |)PRIVATE KEY-----'
+            # AWS credentials pattern
+            'AKIA[0-9A-Z]{16}'
+            'aws_secret_access_key\s*[:=]\s*"[A-Za-z0-9/+=]{40}"'
+            # Generic bearer / token literals longer than typical placeholder
+            'Bearer [a-zA-Z0-9._-]{40,}'
+            # Feishu tenant/user access tokens (real ones start with `t-` or `u-`)
+            '"(t-|u-)[a-zA-Z0-9]{20,}"'
+          )
+
+          for pat in "${PATTERNS[@]}"; do
+            # Exclude venv, runtime output, cached bytecode, and the intentional
+            # pre-refactor snapshots kept for the parity script.
+            hits=$(grep -R -n -E --binary-files=without-match \
+                --exclude-dir=.venv --exclude-dir=runtime --exclude-dir=__pycache__ \
+                --exclude=old_sync_bitable.py --exclude=old_crm_assistant.py \
+                "$pat" . 2>/dev/null || true)
+            if [ -n "$hits" ]; then
+              echo "::error::Potential hardcoded secret matching: $pat"
+              echo "$hits" | sed 's/^/  /'
+              FOUND=$((FOUND + 1))
+            fi
+          done
+
+          if [ "$FOUND" -ne 0 ]; then
+            echo ""
+            echo "::error::Secret scan failed. Remove hardcoded credentials or move them to env vars."
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets detected."

@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import os
-import sys
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-# Add parent common directory to path
-COMMON_DIR = Path(__file__).parent.parent.parent / "common"
-sys.path.insert(0, str(COMMON_DIR))
-
-from feishu.errors import BitableSyncError
-from feishu.client import FeishuClient
+from feishu_client import (
+    FeishuAPIError,
+    batch_create_records as _fc_batch_create_records,
+    choose_parent_type,
+    get_tenant_access_token as _fc_get_tenant_access_token,
+    upload_medium,
+)
 
 
 EXPENSE_TYPE_LABELS = {
@@ -33,6 +33,7 @@ TRANSPORT_FIELD_NAMES = {
     "source_file_name": "源文件名",
     "attachment": "票据附件",
     "invoice_number": "票据号码",
+    "issue_date": "开票日期",
     "amount": "金额",
     "currency": "币种",
     "buyer_name": "购票主体",
@@ -150,29 +151,25 @@ def sync_skill_result_to_bitable(
     transport_records: list[dict[str, Any]] = []
     expense_records: list[dict[str, Any]] = []
 
-    # Initialize FeishuClient only if not dry_run and using app_identity
-    client: FeishuClient | None = None
+    access_token = ""
     if not settings.dry_run and settings.mode == "app_identity":
-        client = FeishuClient(
-            endpoint=settings.endpoint,
-            app_id=settings.app_id,
-            app_secret=settings.app_secret,
-        )
+        access_token = get_tenant_access_token(settings)
 
     for document in documents:
         if not isinstance(document, dict):
             continue
         attachment_payload: list[dict[str, Any]] | str = _build_attachment_text(document.get("source_file_name"))
-        if settings.include_attachments and settings.mode == "app_identity" and client:
+        if settings.include_attachments and settings.mode == "app_identity":
             source_name = str(document.get("source_file_name") or "")
             source_path = attachment_index.get(source_name)
             if source_path:
                 try:
-                    uploaded = client.bitable_upload_attachment(
-                        settings.app_token,
-                        source_path,
+                    uploaded = upload_attachment(
+                        settings=settings,
+                        access_token=access_token,
+                        file_path=source_path,
                     )
-                    attachment_payload = [{"file_token": uploaded["file_token"], "name": uploaded["file_name"]}]
+                    attachment_payload = [{"file_token": uploaded["file_token"], "name": uploaded["name"]}]
                 except BitableSyncError:
                     attachment_payload = _build_attachment_text(source_name)
 
@@ -209,7 +206,7 @@ def sync_skill_result_to_bitable(
         },
     }
 
-    if settings.dry_run or settings.mode != "app_identity" or not client:
+    if settings.dry_run or settings.mode != "app_identity":
         if transport_records:
             summary["tables"]["transport"]["preview"] = transport_records[:3]
         if expense_records:
@@ -217,24 +214,91 @@ def sync_skill_result_to_bitable(
         return summary
 
     if transport_records:
-        result = client.bitable_batch_create(
-            settings.app_token,
-            settings.transport_table_id,
-            transport_records,
-            batch_size=settings.batch_size,
+        written = batch_create_records(
+            settings=settings,
+            access_token=access_token,
+            table_id=settings.transport_table_id,
+            records=transport_records,
         )
-        summary["tables"]["transport"]["records_written"] = result.get("total_written", 0)
+        summary["tables"]["transport"]["records_written"] = written
 
     if expense_records:
-        result = client.bitable_batch_create(
-            settings.app_token,
-            settings.expense_table_id,
-            expense_records,
-            batch_size=settings.batch_size,
+        written = batch_create_records(
+            settings=settings,
+            access_token=access_token,
+            table_id=settings.expense_table_id,
+            records=expense_records,
         )
-        summary["tables"]["expense"]["records_written"] = result.get("total_written", 0)
+        summary["tables"]["expense"]["records_written"] = written
 
     return summary
+
+
+def get_tenant_access_token(settings: BitableSettings) -> str:
+    if not settings.app_id or not settings.app_secret:
+        raise BitableSyncError("Missing FEISHU_APP_ID or FEISHU_APP_SECRET.")
+    try:
+        return _fc_get_tenant_access_token(
+            settings.app_id,
+            settings.app_secret,
+            endpoint=settings.endpoint,
+        )
+    except FeishuAPIError as exc:
+        raise BitableSyncError(str(exc)) from exc
+
+
+def batch_create_records(
+    *,
+    settings: BitableSettings,
+    access_token: str,
+    table_id: str,
+    records: list[dict[str, Any]],
+) -> int:
+    if not table_id:
+        raise BitableSyncError("Missing Bitable table_id.")
+    try:
+        written = _fc_batch_create_records(
+            settings.app_token,
+            table_id,
+            records,
+            access_token,
+            endpoint=settings.endpoint,
+            batch_size=settings.batch_size,
+        )
+    except FeishuAPIError as exc:
+        raise BitableSyncError(str(exc)) from exc
+    # The shared client returns one entry per row it saw acknowledged; if the
+    # server didn't echo details it still returns a stub per submitted record,
+    # so len() is a stable count comparable to the old behaviour.
+    return len(written)
+
+
+def upload_attachment(
+    *,
+    settings: BitableSettings,
+    access_token: str,
+    file_path: str | Path,
+) -> dict[str, Any]:
+    path = Path(file_path)
+    if not path.exists():
+        raise BitableSyncError(f"Attachment file does not exist: {path}")
+    parent_type = choose_parent_type(path)
+    try:
+        uploaded = upload_medium(
+            file_path=path,
+            parent_type=parent_type,
+            parent_node=settings.app_token,
+            token=access_token,
+            endpoint=settings.endpoint,
+        )
+    except FeishuAPIError as exc:
+        raise BitableSyncError(str(exc)) from exc
+    return {
+        "file_token": uploaded["file_token"],
+        "name": uploaded["file_name"],
+        "type": uploaded["mime_type"],
+        "size": uploaded["size"],
+    }
 
 
 def build_transport_record(document: dict[str, Any], attachment_payload: list[dict[str, Any]] | str) -> dict[str, Any]:
@@ -253,6 +317,7 @@ def build_transport_record(document: dict[str, Any], attachment_payload: list[di
         TRANSPORT_FIELD_NAMES["source_file_name"]: source_file_name,
         TRANSPORT_FIELD_NAMES["attachment"]: attachment_payload or _build_attachment_text(source_file_name),
         TRANSPORT_FIELD_NAMES["invoice_number"]: doc_info.get("invoice_number"),
+        TRANSPORT_FIELD_NAMES["issue_date"]: _date_to_millis(doc_info.get("issue_date")),
         TRANSPORT_FIELD_NAMES["amount"]: doc_info.get("amount"),
         TRANSPORT_FIELD_NAMES["currency"]: doc_info.get("currency"),
         TRANSPORT_FIELD_NAMES["buyer_name"]: buyer.get("name"),
@@ -333,12 +398,7 @@ def _date_to_millis(value: Any) -> int | None:
     if isinstance(value, (int, float)):
         return int(value)
     try:
-        date_str = str(value)
-        # 纯日期按北京时间（UTC+8）零点解释——发票/行程日期是中国本地日期，
-        # 固定偏移确保毫秒值与运行环境时区无关（本机、UTC CI 结果一致）。
-        dt = datetime.fromisoformat(date_str)
-        if dt.tzinfo is None:
-            dt = datetime(year=dt.year, month=dt.month, day=dt.day, tzinfo=timezone(timedelta(hours=8)))
+        dt = datetime.fromisoformat(str(value))
     except ValueError:
         return None
     return int(dt.timestamp() * 1000)

@@ -260,6 +260,7 @@ class ValidateSmokeTest(unittest.TestCase):
                 "issue_date": "2025-10-16",
                 "amount": 87.0,
                 "invoice_type": "transportation_fee",
+                "transport_subtype": "rail",
                 "buyer_name": "复旦大学",
                 "buyer_tax_id": "12100000425006117P",
                 "vendor": None,

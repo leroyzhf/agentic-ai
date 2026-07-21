@@ -6,39 +6,18 @@ import os
 import sys
 from pathlib import Path
 
-# Add parent common directory to path
-COMMON_DIR = Path(__file__).resolve().parents[2] / "common"
-sys.path.insert(0, str(COMMON_DIR))
-
-from feishu.http import post_json
+from feishu_client import (
+    FeishuAPIError,
+    exchange_user_code,
+    refresh_user_token,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 TOKENS_PATH = ROOT / "runtime" / "oauth" / "feishu_user_token.json"
-FEISHU_ENDPOINT = os.environ.get("FEISHU_ENDPOINT", "https://open.feishu.cn").rstrip("/")
 
 
-def exchange_code(app_id: str, app_secret: str, code: str) -> dict:
-    return post_json(
-        f"{FEISHU_ENDPOINT}/open-apis/authen/v1/access_token",
-        {
-            "grant_type": "authorization_code",
-            "code": code,
-            "app_id": app_id,
-            "app_secret": app_secret,
-        },
-    )
-
-
-def refresh_token(app_id: str, app_secret: str, refresh_token_value: str) -> dict:
-    return post_json(
-        f"{FEISHU_ENDPOINT}/open-apis/authen/v1/refresh_access_token",
-        {
-            "grant_type": "refresh_token",
-            "refresh_token": refresh_token_value,
-            "app_id": app_id,
-            "app_secret": app_secret,
-        },
-    )
+def _endpoint() -> str:
+    return os.environ.get("FEISHU_ENDPOINT", "https://open.feishu.cn").rstrip("/")
 
 
 def save_token_file(data: dict) -> None:
@@ -80,9 +59,11 @@ def main() -> int:
         }, ensure_ascii=False, indent=2))
         return 1
 
+    endpoint = _endpoint()
+
     try:
         if args.code:
-            resp = exchange_code(app_id, app_secret, args.code)
+            resp = exchange_user_code(app_id, app_secret, args.code, endpoint=endpoint)
             data = resp.get("data", {}) if isinstance(resp, dict) else {}
             save_token_file(data)
             print(json.dumps(sanitize_output(data), ensure_ascii=False, indent=2))
@@ -97,11 +78,18 @@ def main() -> int:
             }, ensure_ascii=False, indent=2))
             return 2
 
-        resp = refresh_token(app_id, app_secret, refresh_value)
+        resp = refresh_user_token(app_id, app_secret, refresh_value, endpoint=endpoint)
         data = resp.get("data", {}) if isinstance(resp, dict) else {}
         save_token_file(data)
         print(json.dumps(sanitize_output(data), ensure_ascii=False, indent=2))
         return 0
+    except FeishuAPIError as exc:
+        print(json.dumps({
+            "ok": False,
+            "error": str(exc),
+            "saved_to": str(TOKENS_PATH),
+        }, ensure_ascii=False, indent=2))
+        return 3
     except Exception as exc:
         print(json.dumps({
             "ok": False,
