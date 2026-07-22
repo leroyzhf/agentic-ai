@@ -20,7 +20,7 @@ defaults:
 
 jobs:
   tests:
-    name: Baseline tests (financial + CRM)
+    name: Baseline tests (financial + CRM + xhs)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,8 +35,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Expose the shared client via PYTHONPATH so both apps' imports resolve.
-      # This mirrors the local venv symlink we set up on disk.
+      # Expose shared packages via PYTHONPATH so all three apps' imports
+      # resolve. This mirrors the local venv symlinks we set up on disk.
       - name: Run financial-automation smoke tests
         working-directory: claude-code/multi-file-refactor/financial-automation
         env:
@@ -48,6 +48,12 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/claude-code/multi-file-refactor/common
         run: python scripts/crm_assistant.py run-merge-policy-tests
+
+      - name: Run xhs-auto-publisher smoke tests
+        working-directory: claude-code/multi-file-refactor/xhs-auto-publisher
+        env:
+          PYTHONPATH: ${{ github.workspace }}/claude-code/multi-file-refactor/common
+        run: python -m unittest tests.test_cloud_notify_smoke
 
   secret-scan:
     name: Hardcoded secret scan
