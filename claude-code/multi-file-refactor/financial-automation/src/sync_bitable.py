@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -402,7 +402,9 @@ def _date_to_millis(value: Any) -> int | None:
     except ValueError:
         return None
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        # Invoice dates are China-domestic (UTC+8). Fixed offset (no DST) is
+        # safe here and avoids depending on the runner's tzdata.
+        dt = dt.replace(tzinfo=timezone(timedelta(hours=8)))
     return int(dt.timestamp() * 1000)
 
 
