@@ -136,6 +136,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .envrc
 .venv
 env/
@@ -211,6 +213,17 @@ __marimo__/
 
 .DS_Store
 *code-workspace
+
+# Sensitive files — prevent accidental commits of credentials and secrets
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+cookies.json
+production.yml
+production.yaml
+secrets/
+
 # Morning Newspaper runtime result files
 morning-newspaper/runtime_results/
 
